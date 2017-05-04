@@ -1,4 +1,4 @@
-using Images, ImageView
+using Images, ImageView, Plots
 
 HDRSequence = Vector{Tuple{Matrix{RGB{N0f8}}, Float64}}
 
@@ -20,13 +20,15 @@ function read_hdrgen_file(path::String)
         println("reading image ", image_path)
         image = load(image_path)
 
-        push!(hdr_pairs, (image, float(exposure)))
+        push!(hdr_pairs, (image, 1.0 / float(exposure)))
     end
 
     return hdr_pairs
 end
 
-function image_synthesis(hdr_pairs::HDRSequence, iterations::Number)
+function image_synthesis(hdr_pairs::HDRSequence,
+                         iterations::Number,
+                         show_intermediate_results = false)
 # description: generating a HDR image by combining multiple images of different
 #              exposure time, while recovering camera's response curve by Gauss-
 #              Seidel relaxation.
@@ -52,7 +54,7 @@ function image_synthesis(hdr_pairs::HDRSequence, iterations::Number)
 
         for (image, exposure) in hdr_pairs
             image_ch = channelview(image)
-            for j in 1:size(image_ch, 3), i in 1:size(image_ch, 2), k in size(image_ch, 1)
+            for j in 1:size(image_ch, 3), i in 1:size(image_ch, 2), k in 1:size(image_ch, 1)
                 ch_i = image_ch[k, i, j] # channel intensity
 
                 ir[k, i, j] += fw(ch_i) * exposure * fi[ch_i.i + 1]
@@ -65,7 +67,7 @@ function image_synthesis(hdr_pairs::HDRSequence, iterations::Number)
 
         for (image, exposure) in hdr_pairs
             image_ch = channelview(image)
-            for j in 1:size(image_ch, 3), i in 1:size(image_ch, 2), k in size(image_ch, 1)
+            for j in 1:size(image_ch, 3), i in 1:size(image_ch, 2), k in 1:size(image_ch, 1)
                 ch_i = image_ch[k, i, j]
 
                 new_fi_normalizer[ch_i.i + 1, k] += 1
@@ -73,11 +75,14 @@ function image_synthesis(hdr_pairs::HDRSequence, iterations::Number)
             end
         end
 
+        # normalizing & constraining fi[129, :] = 1.0
         fi .= new_fi ./ new_fi_normalizer
         fi[:, 1] = fi[:, 1] / fi[129, 1]
         fi[:, 2] = fi[:, 2] / fi[129, 2]
         fi[:, 3] = fi[:, 3] / fi[129, 3]
 
+        if show_intermediate_results
+            imshow()
         imshow(ir[3, :, :])
         #return fi
 
@@ -85,9 +90,8 @@ function image_synthesis(hdr_pairs::HDRSequence, iterations::Number)
         hdr_response = fi
 
    end #for iterations
-#
-    #return (ir, fi) # irradiance, response func
-    return hdr_image, hdr_response
+
+   return hdr_image, hdr_response
 end
 
 function plot_response_function(response_function)
