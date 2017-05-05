@@ -2,7 +2,7 @@
 
 A small library written in Julia for combining images of multiple exposure settings into one HDR image.
 
-!(doc/hdr_rgb.png)
+![](doc/hdr_rgb.png)
 
 ### Installing
 
@@ -41,7 +41,7 @@ Estimating the true irradiance and reconstructing your camera's response curve:
 ir, res = image_synthesis(dseq)
 ```
 
-!(doc/response_plot.png)
+![](doc/response_plot.png)
 
 To visualize the irradiance range:
 
@@ -49,7 +49,7 @@ To visualize the irradiance range:
 pseudo_color_visualizer(ir)
 ```
 
-!(doc/hdr_ir.png)
+![](doc/hdr_ir.png)
 
 ## License
 
