@@ -4,7 +4,7 @@ function hdr_sequence_downsample{T<:Integer}(hdrseq::HDRSequence, downsample_rat
 
     quick_downsample_subm = [hdrseq[i][1][1:downsample_ratio÷2:size(hdrseq[i][1], 1),
                                           1:downsample_ratio÷2:size(hdrseq[i][1], 2)] for i in 1:size(hdrseq, 1)]
-    filtered_image = [imfilter(RGB{N0f8}, quick_downsample_subm[i], gaussian) for i in 1:size(hdrseq, 1)]
+    filtered_image = [imfilter(RGB{N0f8}, quick_downsample_subm[i], gaussian, NA()) for i in 1:size(hdrseq, 1)]
     downsampled_seq = [(filtered_image[i], hdrseq[i][2]) for i in 1:size(hdrseq, 1)]
 
     return downsampled_seq
@@ -12,7 +12,7 @@ end
 
 
 function image_synthesis(hdr_pairs,
-                         iterations::Number,
+                         iterations = -1,
                          show_intermediate_results = false)
 # description: generating a HDR image by combining multiple images of different
 #              exposure time, while recovering camera's response curve by Gauss-
@@ -30,10 +30,12 @@ function image_synthesis(hdr_pairs,
         fi[:, i] = linspace(0.5, 1.5, color_depth)
     end
 
-    hdr_image = Matrix()
-    hdr_response = Matrix()
+    last_ir = zeros(Float64, image_size)
+    last_res = zeros(Float64, (color_depth, color_channel))
 
-    for iteration_count in 1:iterations
+    iteration_count = 0
+
+    while (iteration_count < iterations) || iterations == -1
         ir = zeros(Float64, image_size) #irradiance
         ir_normalizer = zeros(Float64, image_size)
 
@@ -70,16 +72,26 @@ function image_synthesis(hdr_pairs,
         end
 
         if show_intermediate_results
-            imgc, imsl = imshow(colorview(RGB, ir))
+            imgc, imsl = imshow(colorview(RGB, ir) / maximum(ir)) # show by simple linear mapping
             ImageView.annotate!(imgc, imsl,
                                 ImageView.AnnotationText(40, 30, "i=$iteration_count", color = RGB(1, 0, 0),
                                 fontsize = 15))
         end
 
-        hdr_image = ir
-        hdr_response = fi
+        res_diff = fi - last_res
+        res_diff_norm = [norm(res_diff[:, k]) for k in 1:size(res_diff, 2)]
+        #println(norm(res_diff_norm)) #debug
+        #println(last_res[1:10, 1])
+
+        last_ir = copy(ir)
+        last_res = copy(fi)
+
+        iteration_count += 1
+        if iterations == -1 && norm(res_diff_norm) < 2.0
+            break
+        end
 
    end #for iterations
 
-   return hdr_image, hdr_response
+   return (last_ir, last_res)
 end
