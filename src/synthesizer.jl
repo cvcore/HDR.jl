@@ -122,9 +122,9 @@ function image_synthesis(hdr_pairs,
 end
 
 
-function image_intensity_synthesis(hdr_pairs,
-                                   iterations = -1,
-                                   show_intermediate_results = false)
+function image_synthesis_hsl(hdr_pairs,
+                             iterations = -1,
+                             show_intermediate_results = false)
     color_channel = size(channelview(hdr_pairs[1][1]), 1)
     num_images = size(hdr_pairs, 1)
     image_dimension = size(channelview(hdr_pairs[1][1]))
@@ -139,10 +139,15 @@ function image_intensity_synthesis(hdr_pairs,
     hdr_light_pairs = [(N0f8.(channelview(HSL.(image))[3, :, :]), exposure)
                         for (image, exposure) in hdr_pairs]
 
-    # color remapping
     ir, res = image_synthesis(hdr_light_pairs, iterations, show_intermediate_results)
+
+    # quick exponential mapping
+    ir_avg = mean(ir)
+    fr = (x) -> 1 - exp(-x / ir_avg)
+    ir_remapped = fr.(ir)
+
     hsl_channel = channelview(hsl_avg)
-    hsl_channel[3, :, :] = ir
+    hsl_channel[3, :, :] = ir_remapped
 
     return (channelview(RGB.(colorview(HSL, hsl_channel))), res)
 end
