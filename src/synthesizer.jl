@@ -1,3 +1,5 @@
+using Interpolations
+
 function hdr_sequence_downsample{T<:Integer}(hdrseq::HDRSequence, downsample_ratio::T)
     kernel_size = (0.75 * 1, 0.75 * 1)
     gaussian = KernelFactors.gaussian(kernel_size)
@@ -8,6 +10,20 @@ function hdr_sequence_downsample{T<:Integer}(hdrseq::HDRSequence, downsample_rat
     downsampled_seq = [(filtered_image[i], hdrseq[i][2]) for i in 1:size(hdrseq, 1)]
 
     return downsampled_seq
+end
+
+
+function inpaint_nans(v::Vector)
+    y = v[!isnan(v)]
+    x = find(x -> x==false, isnan(v))
+    knots_x = (x, )
+    interpolator = interpolate(knots_x, y, Gridded(Linear()))
+
+    v_new = copy(v)
+    for nan_idx in find(x -> x==true, isnan(v))
+        v_new[nan_idx] = interpolator[nan_idx]
+    end
+    return v_new
 end
 
 
@@ -40,7 +56,7 @@ function image_synthesis(hdr_pairs,
         ir_normalizer = zeros(Float64, image_size)
 
         new_fi = zeros(Float64, (color_depth, color_channel))
-        new_fi_normalizer = zeros(Int64, (color_depth, color_channel))
+        new_fi_normalizer = zeros(Float64, (color_depth, color_channel))
 
         for (image, exposure) in hdr_pairs
             image_ch = channelview(image)
@@ -52,7 +68,7 @@ function image_synthesis(hdr_pairs,
             end
         end
 
-        ir .= ir ./ ir_normalizer
+        ir = ir ./ ir_normalizer
         #ir[isnan(ir)] = 0 # silent NaNs
 
         for (image, exposure) in hdr_pairs
@@ -66,13 +82,22 @@ function image_synthesis(hdr_pairs,
         end
 
         # normalizing & constraining fi(mid intensity) = 1.0
-        fi .= new_fi ./ new_fi_normalizer
+        fi = new_fi ./ new_fi_normalizer
         for ch in 1:color_channel
+            fi[:, ch] = inpaint_nans(fi[:, ch]) # extrapolate NaN holes
             fi[:, ch] = fi[:, ch] / fi[color_depth ÷ 2, ch]
+            #fi[:, ch] = fi_avg[:] / fi_avg[color_depth ÷ 2]
+
+            for intensity in 1:color_depth-1
+                if fi[intensity, ch] > fi[intensity+1, ch]
+                    fi[intensity+1, ch] = fi[intensity, ch]
+                end
+            end
         end
 
         if show_intermediate_results
             imgc, imsl = imshow(colorview(RGB, ir) / maximum(ir)) # show by simple linear mapping
+            #imgc, imsl = imshow(ir / maximum(ir)) # show gray
             ImageView.annotate!(imgc, imsl,
                                 ImageView.AnnotationText(40, 30, "i=$iteration_count", color = RGB(1, 0, 0),
                                 fontsize = 15))
