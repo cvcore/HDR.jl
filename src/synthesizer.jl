@@ -35,7 +35,7 @@ function image_synthesis(hdr_pairs,
 #              Seidel relaxation.
 # input: image sequence as parsed by read_hdrgen_file
 # output: one single HDR image and response function
-    fw = (x) -> exp(-4 * (x - 0.5)^2 / (0.5^2)) # weighing function
+    fw = (x) -> exp(-3 * (x - 0.5)^2 / (0.5^2)) # weighing function
 
     image_size = size(channelview(hdr_pairs[1][1]))
     color_depth = Integer(typemax(channelview(hdr_pairs[1][1])[1].i) + 1)
@@ -43,7 +43,7 @@ function image_synthesis(hdr_pairs,
 
     fi = Array(Float64, (color_depth, color_channel)) # response curve in R, G, B channel
     for i = 1:color_channel
-        fi[:, i] = linspace(0.5, 1.5, color_depth)
+        fi[:, i] = linspace(0, 2, color_depth)
     end
 
     last_ir = zeros(Float64, image_size)
@@ -119,4 +119,30 @@ function image_synthesis(hdr_pairs,
    end #for iterations
 
    return (last_ir, last_res)
+end
+
+
+function image_intensity_synthesis(hdr_pairs,
+                                   iterations = -1,
+                                   show_intermediate_results = false)
+    color_channel = size(channelview(hdr_pairs[1][1]), 1)
+    num_images = size(hdr_pairs, 1)
+    image_dimension = size(channelview(hdr_pairs[1][1]))
+
+    rgb_sum = zeros(Float64, image_dimension) # TODO: add weighing func?
+    for (image, exposure) in hdr_pairs
+        rgb_sum += channelview(image)
+    end
+    rgb_avg = colorview(RGB, rgb_sum / num_images)
+    hsl_avg = HSL.(rgb_avg) # we are going to use H & S channel
+
+    hdr_light_pairs = [(N0f8.(channelview(HSL.(image))[3, :, :]), exposure)
+                        for (image, exposure) in hdr_pairs]
+
+    # color remapping
+    ir, res = image_synthesis(hdr_light_pairs, iterations, show_intermediate_results)
+    hsl_channel = channelview(hsl_avg)
+    hsl_channel[3, :, :] = ir
+
+    return (channelview(RGB.(colorview(HSL, hsl_channel))), res)
 end
