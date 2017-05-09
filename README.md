@@ -49,8 +49,17 @@ To visualize the irradiance range:
 pseudo_color_visualizer(ir)
 ```
 
+### Note
+
+Please make sure for each pixel in your images at least one image covers its correct exposure. Otherwise, that pixel will be NaN in the resulting image. Currently we don't handle this. But you can try to interpolate that value yourself, for example:
+
+```
+ir_nonan = copy(ir)
+ir_nonan[isnan(ir_nonan)] = maximum(ir)
+```
+
 ![](doc/hdr_ir.png)
 
 ## License
 
-TBD
+MIT
