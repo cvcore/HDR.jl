@@ -35,7 +35,7 @@ function image_synthesis(hdr_pairs,
 #              Seidel relaxation.
 # input: image sequence as parsed by read_hdrgen_file
 # output: one single HDR image and response function
-    fw = (x) -> exp(-3 * (x - 0.5)^2 / (0.5^2)) # weighing function
+    fw = (x) -> exp(-8 * (x - 0.5)^2 / (0.5^2)) # weighing function
 
     image_size = size(channelview(hdr_pairs[1][1]))
     color_depth = Integer(typemax(channelview(hdr_pairs[1][1])[1].i) + 1)
@@ -88,11 +88,11 @@ function image_synthesis(hdr_pairs,
             fi[:, ch] = fi[:, ch] / fi[color_depth ÷ 2, ch]
             #fi[:, ch] = fi_avg[:] / fi_avg[color_depth ÷ 2]
 
-            for intensity in 1:color_depth-1
-                if fi[intensity, ch] > fi[intensity+1, ch]
-                    fi[intensity+1, ch] = fi[intensity, ch]
-                end
-            end
+            #for intensity in 1:color_depth-1
+            #    if fi[intensity, ch] > fi[intensity+1, ch]
+            #        fi[intensity+1, ch] = fi[intensity, ch]
+            #    end
+            #end
         end
 
         if show_intermediate_results
